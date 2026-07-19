@@ -148,7 +148,6 @@
 <header>
   <h1>GOAT G1 Beacon Map Optimizer</h1>
   <span class="badge">v2.0</span>
-  <span class="hint" style="display:none" id="dirtyFlag"></span>
   <div class="spacer"></div>
   <button class="hbtn" id="btnHelp">❔ Help</button>
   <button class="hbtn" id="btnSaveFile">⬇ Export project</button>
@@ -312,9 +311,11 @@
     <p>The GOAT G1 finds itself by triangulating off the UWB beacons, so it needs to "see" at least <b>two</b> beacons at any spot. Ecovacs requires <b>≥80% of the map covered by 2+ beacons</b> and <b>≤10% with no coverage at all</b>. Covering an area with a single beacon is not enough — that's the main thing this tool optimizes for, and the thing most DIY placements get wrong.</p>
     <h4>Line of sight</h4>
     <p>Tall obstacles (&gt;60 cm) block the radio signal. The heatmap and validator both account for obstacles sitting between a beacon and a patch of lawn, and between beacons themselves.</p>
+    <p class="hint">This tool uses the <b>45 m beacon spacing limit</b> as the beacon's effective coverage radius — a modeling assumption, since Ecovacs specifies the spacing but not a separate robot‑to‑beacon range, so the heatmap is approximate near the 45 m fringe. Also draw the <b>house, fences and sheds as obstacles</b> even when they sit outside the mow area: obstacles block line‑of‑sight wherever they are, and the optimizer only places beacons on mowable lawn (real installs often stake beacons just outside the edge).</p>
     <h4>Keyboard</h4>
     <p><kbd>Enter</kbd>/<kbd>double‑click</kbd> finish polygon · <kbd>Backspace</kbd> undo last point · <kbd>Esc</kbd> cancel · <kbd>1–7</kbd> switch tools · wheel to zoom · right/middle‑drag to pan.</p>
     <p class="hint">Distances and rules are from the official Ecovacs GOAT G1 manual &amp; FAQ. This tool is an unofficial planning aid — always confirm in the ECOVACS Home app during setup.</p>
+    <p class="hint">Note: the 45 m limit is used as both the beacon‑to‑beacon spacing maximum and a proxy coverage radius. Draw the house/fences as obstacles even outside the lawn — they block signal too.</p>
   </div>
 </div>
 
@@ -358,6 +359,8 @@ let snapGrid = false, showHeat = true, showRange = false;
 let grid = [];                 // mowable sample cells [{x,y}]
 let coverageCounts = [];       // beacon-count per grid cell
 let dragTarget = null;         // {type, ref} while moving
+let geomRev = 0;               // bumps when geometry changes (candidate cache invalidation)
+let imgWarnShown = false;      // one-time warning for oversized image auto-save
 
 /* ===================== HELPERS ===================== */
 const $ = id => document.getElementById(id);
@@ -429,7 +432,7 @@ function setTool(name){
 document.addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
   if(e.key==='Enter') finishPolygon(true);
-  else if(e.key==='Escape') finishPolygon(false);
+  else if(e.key==='Escape'){ if($('helpModal').classList.contains('show')) $('helpModal').classList.remove('show'); else finishPolygon(false); }
   else if(e.key==='Backspace'){ if(currentPoly.length){ currentPoly.pop(); draw(); e.preventDefault(); } }
   else if(/^[1-7]$/.test(e.key)) setTool(toolKeys[+e.key-1]);
 });
@@ -438,7 +441,7 @@ document.addEventListener('keydown', e=>{
 $('imgInput').addEventListener('change', e=>{
   const file=e.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=()=>{ imgDataUrl=reader.result; loadImage(imgDataUrl, true); };
+  reader.onload=()=>{ imgDataUrl=reader.result; loadImage(imgDataUrl, true); e.target.value=''; };
   reader.readAsDataURL(file);
 });
 function loadImage(url, reset){
@@ -450,7 +453,12 @@ function loadImage(url, reset){
 /* ===================== CANVAS RESIZE ===================== */
 function resize(){
   const r=canvas.parentElement.getBoundingClientRect();
-  canvas.width=r.width; canvas.height=r.height; draw();
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=Math.max(1,Math.round(r.width*dpr));
+  canvas.height=Math.max(1,Math.round(r.height*dpr));
+  canvas.style.width=r.width+'px'; canvas.style.height=r.height+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  draw();
 }
 window.addEventListener('resize', resize);
 setTimeout(resize,0);
@@ -472,9 +480,12 @@ canvas.addEventListener('mousedown', e=>{
     else { refLine.p2=pt; }
     draw(); markDirty(); return;
   }
-  if(tool==='erase'){ eraseAt(sx,sy); recompute(); markDirty(); return; }
+  if(tool==='erase'){ eraseAt(w.x,w.y); recompute(); markDirty(); return; }
   if(tool==='move'){ dragTarget=pickTarget(w); if(dragTarget) canvas.style.cursor='grabbing'; return; }
   if(tool==='boundary' || tool==='obstacle'){
+    // ignore a duplicate of the last point (e.g. the second click of a double-click)
+    if(currentPoly.length){ const last=currentPoly[currentPoly.length-1];
+      if(Math.abs(last.x-pt.x)<1e-6 && Math.abs(last.y-pt.y)<1e-6) return; }
     // click near first point closes
     if(currentPoly.length>2 && dist(pt,currentPoly[0]) < 10/zoom){ finishPolygon(true); return; }
     currentPoly.push(pt); draw(); return;
@@ -484,8 +495,7 @@ canvas.addEventListener('mousemove', e=>{
   const p=getMousePos(e); const w=toWorld(p.x,p.y); hoverPt=w;
   $('mousePos').textContent = scale ? `${m(w.x).toFixed(1)} m, ${m(w.y).toFixed(1)} m` : `${w.x.toFixed(0)}, ${w.y.toFixed(0)} px`;
   if(isPanning){ pan.x+=p.x-panStart.x; pan.y+=p.y-panStart.y; panStart=p; draw(); return; }
-  if(dragTarget){ const sx=snap(w.x), sy=snap(w.y); dragTarget.ref.x=sx; dragTarget.ref.y=sy;
-    if(dragTarget.type==='refpt'){ draw(); } else { draw(); } return; }
+  if(dragTarget){ const sx=snap(w.x), sy=snap(w.y); dragTarget.ref.x=sx; dragTarget.ref.y=sy; draw(); return; }
   if(tool==='boundary'||tool==='obstacle'||tool==='refline') draw();
 });
 window.addEventListener('mouseup', ()=>{
@@ -503,6 +513,7 @@ canvas.addEventListener('wheel', e=>{
 function finishPolygon(commit){
   if(currentPoly.length>2 && commit){
     if(tool==='obstacle') obstacles.push([...currentPoly]); else boundaries.push([...currentPoly]);
+    geomRev++;
     currentPoly=[]; recompute(); markDirty();
   } else { currentPoly=[]; draw(); }
 }
@@ -522,6 +533,7 @@ function eraseAt(x,y){
   boundaries=boundaries.filter(p=>!p.some(near));
   obstacles=obstacles.filter(p=>!p.some(near));
   if(refLine && ((refLine.p1&&near(refLine.p1))||(refLine.p2&&near(refLine.p2)))) refLine=null;
+  geomRev++;
 }
 
 /* ===================== SCALE ===================== */
@@ -530,6 +542,7 @@ $('btnSetScale').addEventListener('click', ()=>{
   const real=parseFloat($('refReal').value);
   if(!real||real<=0){ flash('Enter a valid real-world length.'); return; }
   scale=dist(refLine.p1,refLine.p2)/real;
+  geomRev++;
   $('scaleVal').textContent=scale.toFixed(1);
   $('scaleOverlay').textContent=scale.toFixed(1)+' px/m';
   recompute(); markDirty();
@@ -585,9 +598,13 @@ function generateCandidates(){
   boundaries.forEach(poly=>poly.forEach((p,i)=>{
     const nx=poly[(i+1)%poly.length]; const dx=nx.x-p.x, dy=nx.y-p.y; const len=Math.hypot(dx,dy)||1;
     const steps=Math.max(1,Math.floor(len/step));
+    const n1x=-dy/len, n1y=dx/len;            // inward normal (one winding)
+    const n2x=dy/len,  n2y=-dx/len;           // opposite normal (other winding)
     for(let s=0;s<=steps;s++){ const t=s/steps; const px=p.x+dx*t, py=p.y+dy*t;
-      const ix=px+(-dy/len)*inset, iy=py+(dx/len)*inset;
-      if(ok(ix,iy)) cands.push({x:ix,y:iy}); }
+      const ix=px+n1x*inset, iy=py+n1y*inset;
+      if(ok(ix,iy)) cands.push({x:ix,y:iy});
+      const jx=px+n2x*inset, jy=py+n2y*inset;
+      if(ok(jx,jy)) cands.push({x:jx,y:jy}); }
   }));
   return cands;
 }
@@ -613,6 +630,13 @@ function optimizePlacement(maxN){
   const counts=new Int8Array(grid.length);   // running coverage per cell
   const chosen=[];
 
+  // spacing floor for the anti-cluster rule: never larger than 9 m, but scaled down
+  // for small lawns so the mandatory 2 beacons can still be placed (B1)
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  boundaries.forEach(p=>p.forEach(v=>{minX=Math.min(minX,v.x);minY=Math.min(minY,v.y);maxX=Math.max(maxX,v.x);maxY=Math.max(maxY,v.y);}));
+  const diagM=m(Math.hypot(maxX-minX,maxY-minY));
+  const spacingFloor=Math.max(scale, Math.min(BEACON_RANGE_M*scale*0.2, (diagM/3)*scale));
+
   function marginalScore(ci){
     let score=0;
     for(const cell of cover[ci]){
@@ -631,7 +655,8 @@ function optimizePlacement(maxN){
     for(let ci=0;ci<cands.length;ci++){
       if(chosen.includes(ci)) continue;
       const c=cands[ci];
-      if(chosen.some(k=>dist(cands[k],c) < BEACON_RANGE_M*scale*0.2)) continue; // not too clustered
+      // not too clustered; relax for the mandatory first two beacons so small lawns still get 2 (B1)
+      if(chosen.length>=INCLUDED_BEACONS && chosen.some(k=>dist(cands[k],c) < spacingFloor)) continue;
       const s=marginalScore(ci);
       if(s>bestScore){ bestScore=s; best=ci; }
     }
@@ -644,21 +669,23 @@ function optimizePlacement(maxN){
     if(n+1>=INCLUDED_BEACONS && dualNow>=DUAL_TARGET && uncov<=UNCOVERED_MAX) break;
   }
   beacons = chosen.map(ci=>({x:cands[ci].x, y:cands[ci].y}));
-  localRefine(cands, cover);
+  localRefine(cands);
   recompute(); markDirty();
   const st=coverageStats();
   flash(`Placed ${beacons.length} beacon${beacons.length>1?'s':''} · ${(st.dual*100).toFixed(0)}% dual coverage · ${(st.uncovered*100).toFixed(0)}% no signal.`);
 }
 function tally(arr,fn){ let n=0; for(const v of arr) if(fn(v)) n++; return n; }
 
-function localRefine(cands, cover){
+function localRefine(cands){
   if(!beacons.length) return;
   const score=()=>{ computeCoverage(); const s=coverageStats(); return s.dual*3 - s.uncovered*4; };
   let cur=score();
   for(let pass=0;pass<2;pass++){
     for(let bi=0;bi<beacons.length;bi++){
       let bestCand=null,bestVal=cur; const b=beacons[bi];
-      for(let ci=0;ci<cands.length;ci++){
+      // D2: only evaluate the nearest candidates to keep large maps responsive
+      const nearIdx=cands.map((c,ci)=>({ci,d:dist(c,b)})).sort((a,b)=>a.d-b.d).slice(0,40);
+      for(const {ci} of nearIdx){
         const c=cands[ci]; if(dist(c,b)>BEACON_RANGE_M*scale*0.4) continue; // local only
         const old={x:b.x,y:b.y}; b.x=c.x; b.y=c.y;
         const v=score();
@@ -714,8 +741,9 @@ function validate(){
   beacons.forEach((b,i)=>{ b._issues=[];
     obstacles.forEach((poly,oi)=>{ const d=m(distToObstacle(b,poly));
       if(d<TALL_OBSTACLE_GAP_M){ obstOK=false; b._issues.push(`<5 m from obstacle ${oi+1} (${d.toFixed(1)} m)`); } });
-    // within bounds
-    if(!insideAnyBoundary(b.x,b.y)) b._issues.push('outside lawn boundary');
+    // within bounds — warning only, does not fail the spec
+    if(!insideAnyBoundary(b.x,b.y)){ b._issues.push('outside lawn boundary');
+      issues.push(`Beacon B${i+1} is outside the lawn boundary (warning — real installs often stake beacons just outside the edge).`); }
   });
   if(!obstOK) issues.push('Some beacons are within 5 m of a tall obstacle — signal may be poor.');
   setPill('chkObst', obstacles.length? obstOK : true);
@@ -743,10 +771,12 @@ function validate(){
   // beacon count guidance
   if(beacons.length>MAX_BEACONS) issues.push('More than 10 beacons — not supported.');
 
-  // overall status
-  const allOK = dualOK && uncovOK && (beacons.length<2?false:linkOK) && obstOK && losIssues===0 && (!stations.length||stationOK);
+  // overall status — a blocked pair within range only adds a warning (B3), not a failure
+  const allOK = dualOK && uncovOK && (beacons.length<2?false:linkOK) && obstOK && (!stations.length||stationOK);
   if(beacons.length===0) setStatus('warn','No beacons placed yet — run Compute Optimal Placement.');
-  else if(allOK) setStatus('ok','✓ Meets Ecovacs spec: 80% dual coverage, all beacons linked.');
+  else if(allOK){ let msg='✓ Meets Ecovacs spec: 80% dual coverage, all beacons linked.';
+    if(!stations.length) msg+=' (Station not placed — still needs 2 m clear on sides & front at install.)';
+    setStatus('ok', msg); }
   else setStatus('bad', issues[0] || 'Coverage spec not met.');
 
   $('issueList').innerHTML = issues.length ? '⚠ '+issues.join('<br>⚠ ') : '';
@@ -758,14 +788,17 @@ function updateBeaconList(){
   const el=$('beaconList');
   if(!beacons.length){ el.innerHTML='<div class="hint">No beacons yet.</div>'; return; }
   const origin=stations[0] || gridOrigin();
+  const unit=scale?' m':' px';
+  const fmt=v=> scale ? m(v).toFixed(1) : v.toFixed(0);
   el.innerHTML=beacons.map((b,i)=>{
     let nn=Infinity; beacons.forEach((o,j)=>{ if(i!==j) nn=Math.min(nn,m(dist(b,o))); });
-    const rx=m(b.x-origin.x).toFixed(1), ry=m(b.y-origin.y).toFixed(1);
-    const bad=(b._issues&&b._issues.length)|| (beacons.length>1 && nn>BEACON_RANGE_M);
+    const rx=fmt(b.x-origin.x), ry=fmt(b.y-origin.y);
+    const bad=(b._issues&&b._issues.length)|| (scale && beacons.length>1 && nn>BEACON_RANGE_M);
     const col=bad?'var(--danger)':'var(--ok)';
     const tip=b._issues&&b._issues.length?` · ${b._issues.join('; ')}`:'';
+    const nnTxt = !scale ? '—' : (isFinite(nn)?nn.toFixed(0)+'m':'—');
     return `<div class="item" style="color:${col}">
-      <span>B${i+1} <span class="coord">(${rx}, ${ry} m)</span> <span class="coord">↔${isFinite(nn)?nn.toFixed(0)+'m':'—'}</span>${tip}</span>
+      <span>B${i+1} <span class="coord">(${rx}, ${ry}${unit})</span> <span class="coord">↔${nnTxt}</span>${tip}</span>
       <span class="del" onclick="removeBeacon(${i})">✕</span></div>`;
   }).join('');
 }
@@ -779,7 +812,8 @@ window.removeBeacon=function(i){ beacons.splice(i,1); recompute(); markDirty(); 
 function updateJustification(){
   const price=parseFloat($('beaconPrice').value)||0;
   if(!scale||!grid.length){ $('scenarioBox').textContent='Run optimization to see the justification.';
-    ['cov2','covNow','needCount'].forEach(id=>$(id).textContent='—'); return; }
+    $('cov2').textContent='—'; $('covNow').textContent='—'; $('needCount').textContent='—';
+    $('extraBeacons').textContent='0'; $('beaconCost').textContent='$0'; return; }
   const s=coverageStats();
   $('covNow').textContent=(s.dual*100).toFixed(0)+'% (with '+beacons.length+')';
   // single greedy pass: curve[k] = best dual coverage with k beacons
@@ -801,10 +835,12 @@ function updateJustification(){
     box.textContent=`⚠️ Even 10 beacons can't hit 80% dual coverage with this layout — likely too many tall obstacles or an awkward shape. Reduce obstacles or split into zones.`; }
 }
 // One greedy pass; returns curve[k] = best dual coverage with k beacons (k = 0..MAX_BEACONS)
+let _curveCache=null, _curveRev=-1;
 function coverageCurve(){
+  if(_curveRev===geomRev && _curveCache) return _curveCache;   // D1: cache per geometry
   const curve=[0];
-  if(!grid.length) return curve;
-  const cands=generateCandidates(); if(!cands.length) return curve;
+  if(!grid.length){ _curveCache=curve; _curveRev=geomRev; return curve; }
+  const cands=generateCandidates(); if(!cands.length){ _curveCache=curve; _curveRev=geomRev; return curve; }
   const cover=candidateCoverage(cands);
   const counts=new Int8Array(grid.length); const chosen=[];
   for(let n=0;n<MAX_BEACONS;n++){
@@ -818,6 +854,7 @@ function coverageCurve(){
     chosen.push(best); for(const cell of cover[best]) counts[cell]++;
     curve.push(tally(counts,c=>c>=2)/grid.length);
   }
+  _curveCache=curve; _curveRev=geomRev;
   return curve;
 }
 
@@ -914,15 +951,20 @@ function resetView(){
 /* ===================== UI WIRES ===================== */
 $('btnOptimize').addEventListener('click', ()=>optimizePlacement(parseInt($('maxBeacons').value)||MAX_BEACONS));
 $('btnRefine').addEventListener('click', ()=>{ if(!beacons.length){flash('Place or compute beacons first.');return;}
-  buildGrid(); const c=generateCandidates(); localRefine(c,candidateCoverage(c)); recompute(); markDirty(); });
+  buildGrid(); const c=generateCandidates(); localRefine(c); recompute(); markDirty(); });
 $('btnClearBeacons').addEventListener('click', ()=>{ beacons=[]; recompute(); markDirty(); });
 $('snapGrid').addEventListener('change', e=>snapGrid=e.target.checked);
 $('showHeat').addEventListener('change', e=>{showHeat=e.target.checked; draw();});
 $('showRange').addEventListener('change', e=>{showRange=e.target.checked; draw();});
 $('beaconPrice').addEventListener('input', updateJustification);
 $('maxBeacons').addEventListener('change', e=>{ e.target.value=Math.max(2,Math.min(10,parseInt(e.target.value)||10)); });
-$('zoomIn').addEventListener('click', ()=>{zoom=Math.min(20,zoom*1.2);draw();});
-$('zoomOut').addEventListener('click', ()=>{zoom=Math.max(0.05,zoom/1.2);draw();});
+function zoomBy(f){   // zoom keeping the canvas centre fixed (B9)
+  const r=canvas.getBoundingClientRect(); const cx=r.width/2, cy=r.height/2; const w=toWorld(cx,cy);
+  zoom=Math.max(0.05,Math.min(20,zoom*f));
+  pan.x=cx-w.x*zoom; pan.y=cy-w.y*zoom; draw();
+}
+$('zoomIn').addEventListener('click', ()=>zoomBy(1.2));
+$('zoomOut').addEventListener('click', ()=>zoomBy(1/1.2));
 $('zoomFit').addEventListener('click', resetView);
 $('btnHelp').addEventListener('click', ()=>$('helpModal').classList.add('show'));
 $('helpClose').addEventListener('click', ()=>$('helpModal').classList.remove('show'));
@@ -934,17 +976,32 @@ function flash(msg){ const b=$('banner'); b.textContent=msg; b.style.display='bl
 /* ===================== SAVE / LOAD ===================== */
 function serialize(){
   return JSON.stringify({ v:2, scale, boundaries, obstacles, stations, beacons:beacons.map(b=>({x:b.x,y:b.y})),
-    refLine, refReal:$('refReal').value, maxBeacons:$('maxBeacons').value, beaconPrice:$('beaconPrice').value, imgDataUrl });
+    refLine, refReal:$('refReal').value, maxBeacons:$('maxBeacons').value, beaconPrice:$('beaconPrice').value,
+    snapGrid, showHeat, showRange, imgDataUrl });
 }
-function saveLocal(){ try{ localStorage.setItem('goatG1Project', serialize()); }catch(e){} }
+function saveLocal(){
+  try{ localStorage.setItem('goatG1Project', serialize()); }
+  catch(e){
+    // localStorage quota exceeded — usually a large embedded image. Retry without it.
+    try{
+      const data=JSON.parse(serialize()); data.imgDataUrl=null;
+      localStorage.setItem('goatG1Project', JSON.stringify(data));
+      if(!imgWarnShown){ imgWarnShown=true; flash('Background image too large to auto‑save — geometry saved locally; the exported file still keeps the image.'); }
+    }catch(e2){}
+  }
+}
 function loadState(d){
   scale=d.scale||0; boundaries=d.boundaries||[]; obstacles=d.obstacles||[]; stations=d.stations||[];
   beacons=(d.beacons||[]).map(b=>({x:b.x,y:b.y})); refLine=d.refLine||null;
   if(d.refReal!=null) $('refReal').value=d.refReal;
   if(d.maxBeacons!=null) $('maxBeacons').value=d.maxBeacons;
   if(d.beaconPrice!=null) $('beaconPrice').value=d.beaconPrice;
+  if(d.snapGrid!=null){ snapGrid=d.snapGrid; $('snapGrid').checked=d.snapGrid; }
+  if(d.showHeat!=null){ showHeat=d.showHeat; $('showHeat').checked=d.showHeat; }
+  if(d.showRange!=null){ showRange=d.showRange; $('showRange').checked=d.showRange; }
   if(scale){ $('scaleVal').textContent=scale.toFixed(1); $('scaleOverlay').textContent=scale.toFixed(1)+' px/m'; }
   imgDataUrl=d.imgDataUrl||null;
+  geomRev++;
   const after=()=>{ resetView(); recompute(); };
   if(imgDataUrl){ img=new Image(); img.onload=after; img.src=imgDataUrl; } else { img=null; after(); }
 }
@@ -955,7 +1012,7 @@ $('btnSaveFile').addEventListener('click', ()=>{
 });
 $('projInput').addEventListener('change', e=>{
   const f=e.target.files[0]; if(!f) return; const r=new FileReader();
-  r.onload=()=>{ try{ loadState(JSON.parse(r.result)); flash('Project loaded.'); }catch(err){ flash('Invalid project file.'); } };
+  r.onload=()=>{ try{ loadState(JSON.parse(r.result)); flash('Project loaded.'); }catch(err){ flash('Invalid project file.'); } e.target.value=''; };
   r.readAsText(f);
 });
 
@@ -968,6 +1025,7 @@ $('btnReport').addEventListener('click', ()=>{
   const okClass=v=>v?'style="color:#0a0"':'style="color:#c00"';
   const dualOK=s.dual>=DUAL_TARGET, uncovOK=s.uncovered<=UNCOVERED_MAX;
   const w=window.open('','_blank');
+  if(!w){ flash('Report blocked by your popup blocker. Allow popups for this page and try again.'); return; }
   w.document.write(`<html><head><title>GOAT G1 Beacon Placement Report</title>
   <style>body{font-family:Arial;margin:32px;color:#111} h1{font-size:20px} table{border-collapse:collapse;margin:12px 0} td,th{border:1px solid #ccc;padding:6px 12px;text-align:left;font-size:13px} .k{color:#555} .note{font-size:12px;color:#555;margin-top:20px}</style>
   </head><body>

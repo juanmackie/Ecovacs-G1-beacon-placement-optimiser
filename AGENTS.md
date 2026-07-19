@@ -82,7 +82,7 @@ When the user requests a durable behavior change, record it here or in the relev
 
 - **Purpose**: Beacon placement optimizer for the ECOVACS GOAT G1 robotic mower
 - **Tech**: Single-file HTML app (HTML + CSS + vanilla JS, no build step)
-- **File**: `ecovacs_goat_g1_beacon_optimizer.html` — the entire app (~1005 lines)
+- **File**: `index.html` — the entire app (~1063 lines)
 - **Data**: `MEMORY.md` — memory index for project context
 - **Config**: `.claude/settings.local.json` — Claude permissions
 
@@ -92,17 +92,19 @@ The app is a self-contained single-file tool with these major sections inside th
 
 | Section | Lines (approx) | Responsibility |
 |---|---|---|
-| Constants | 332–340 | Range (45m), max beacons (10), coverage targets (80%/10%), grid resolution |
-| State | 343–360 | Canvas, zoom/pan, polygons, beacons, scale, grid |
-| Helpers | 363–415 | Coordinate transforms, point-in-polygon, line-of-sight, obstacle distance |
-| Tools & Input | 417–508 | Tool switching, pointer events, polygon drawing, keyboard shortcuts |
-| Scale | 527–542 | Reference line to real-world scale conversion |
-| Coverage Grid | 544–572 | Sample mowable cells, count beacon coverage per cell |
-| Optimizer | 574–671 | Candidate generation, greedy marginal-score placement, local refine |
-| Validation | 673–755 | Check 5 specs: dual coverage, no-signal, link, obstacle gap, station |
-| Rendering | 824–912 | Canvas draw: heatmap, polygons, beacons, links, grid |
-| Save/Load | 934–960 | JSON serialize, localStorage, file export/import |
-| Report | 962–996 | Print-friendly placement report in a new window |
+| Constants | 332–342 | Range (45m), max beacons (10), coverage targets (80%/10%), grid resolution |
+| State | 343–364 | Canvas, zoom/pan, polygons, beacons, scale, grid, geom-rev cache flag |
+| Helpers | 365–419 | Coordinate transforms, point-in-polygon, line-of-sight, obstacle distance |
+| Tools & Input | 420–538 | Tool switching, file upload, resize (DPR-aware), pointer events, polygon drawing, keyboard shortcuts |
+| Scale | 539–556 | Reference line → real-world scale conversion |
+| Coverage Grid | 557–586 | Sample mowable cells, count beacon coverage per cell |
+| Optimizer | 587–699 | Candidate generation (both inset normals), greedy marginal-score placement, local refine (capped), coverage curve |
+| Validation | 700–810 | Check 5 specs: dual coverage, no-signal, link, obstacle gap, station |
+| Justification | 811–860 | "How many beacons & why" cost / coverage-curve panel |
+| Rendering | 861–950 | Canvas draw: heatmap, polygons, beacons, links, grid |
+| UI Wires | 951–975 | Event listeners, zoom controls (centre-anchored), flash/banner |
+| Save / Load | 976–1018 | JSON serialize (persists checkbox states), localStorage (quota fallback), file export/import |
+| Report | 1019–1055 | Print-friendly placement report in a new window (popup-blocker safe) |
 
 ## Key Ecovacs GOAT G1 Specs
 
@@ -114,9 +116,17 @@ The app is a self-contained single-file tool with these major sections inside th
 - Ships with 2 beacons; max 10 per mower
 - Moving a beacon after mapping requires full remap
 
+## Modeling & Validation Notes
+
+- The app uses the **45 m beacon spacing limit as the effective beacon coverage radius** — a modeling assumption (Ecovacs specifies spacing, not a separate robot-to-beacon range); heatmap is approximate near the 45 m fringe. Documented in the Help modal.
+- Obstacles anywhere block line-of-sight, including those drawn outside the lawn boundary; users should draw the house/fences as obstacles even outside the mow area.
+- **Out-of-bounds beacons and blocked in-range pairs are warnings, not failures.** `allOK` (the ✓ Meets spec status) requires dual-coverage, no-signal, link connectivity, obstacle gap, and station clearance — but a missing station passes (with a note) and an out-of-bounds/blocked beacon only adds a warning line.
+- Optimizer places a **mandatory 2 beacons** minimum; the anti-cluster spacing floor is scaled to the lawn diagonal so small lawns still get 2.
+- Beacon candidates are restricted to mowable lawn (candidates outside the boundary are flagged as warnings).
+
 ## Verification
 
-- Open `ecovacs_goat_g1_beacon_optimizer.html` in a browser
+- Open `index.html` in a browser
 - Draw a boundary, set scale, place beacons, run optimizer
 - Confirm the validation panel shows PASS for all 5 checks
 - Test import/export round-trip
@@ -125,5 +135,5 @@ The app is a self-contained single-file tool with these major sections inside th
 
 | Child | Scope |
 |---|---|
-| `ecovacs_goat_g1_beacon_optimizer.html` | Single-file beacon optimizer app (CSS + JS + canvas + optimizer algorithm) |
+| `index.html` | Single-file beacon optimizer app (CSS + JS + canvas + optimizer algorithm) |
 | `README.md` | Project overview, usage guide, specs reference |

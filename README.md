@@ -32,7 +32,7 @@ The GOAT G1 navigates by triangulating off UWB beacons. It needs to "see" **two 
 
 ## Quick start
 
-1. Open `ecovacs_goat_g1_beacon_optimizer.html` in any modern browser (no server needed)
+1. Open `index.html` in any modern browser (no server needed)
 2. *(Optional)* Upload a garden image
 3. **Set scale** — pick Ref Line, click two ends of something you know the length of, enter metres, click Set Scale
 4. **Draw the lawn** — click corners with the Lawn Boundary tool, double-click or Enter to close
@@ -79,10 +79,17 @@ The "How Many Beacons & Why" panel runs a separate greedy pass to plot how dual 
 
 ## Technical details
 
-- Single self-contained HTML file (~1000 lines), no dependencies
-- Pure vanilla JS + Canvas 2D
-- State persisted to localStorage on every edit
+- Single self-contained HTML file (~1060 lines), no dependencies
+- Pure vanilla JS + Canvas 2D, HiDPI-aware (devicePixelRatio scaling)
+- State persisted to localStorage on every edit (auto-save falls back to geometry-only if the background image exceeds the storage quota)
 - Project files are JSON with embedded base64 background images
+- Optimizer caches the coverage curve per geometry revision, so editing beacons or typing a price doesn't re-run the full re-optimization
+
+## Modeling notes
+
+- The **45 m** beacon spacing limit is also used as the beacon's effective coverage radius — a planning assumption (Ecovacs specifies spacing, not a separate robot-to-beacon range), so coverage near the 45 m fringe is approximate.
+- Draw the **house, fences and sheds as obstacles** even when they sit outside the mow area — obstacles block line-of-sight wherever they are.
+- Beacons placed **outside the lawn boundary**, and in-range pairs **blocked by an obstacle**, show as **warnings**, not hard failures — they don't block the "✓ Meets Ecovacs spec" status but are flagged in the issue list. A missing station also passes (with a note).
 
 ## Sources
 
