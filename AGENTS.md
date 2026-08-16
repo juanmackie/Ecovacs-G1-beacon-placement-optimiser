@@ -84,7 +84,8 @@ When the user requests a durable behavior change, record it here or in the relev
 - **Tech**: Single-file HTML app (HTML + CSS + vanilla JS, no build step)
 - **File**: `index.html` — the entire app (~1063 lines)
 - **Data**: `MEMORY.md` — memory index for project context
-- **Config**: `.claude/settings.local.json` — Claude permissions
+- **Config**: `.claude/settings.local.json` — Claude permissions (git-ignored)
+- **Git**: `.gitignore` — repo-level ignore rules for forbidden files (plan.md, .env, *.local.md, production-ready-vibe-coding-rules, settings.local.json) and local/editor noise
 
 ## Architecture
 

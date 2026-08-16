@@ -1,0 +1,33 @@
+# --- Files never to commit (per production-ready vibe coding rules) ---
+
+# Planning notes
+plan.md
+
+# Subagent state
+.pi-subagents/
+
+# Secrets / environment
+.env
+
+# This project's own rules reference document (and variations)
+production-ready-vibe-coding-rules*.md
+
+# Local-only Editor/Claude markdown notes
+*.local.md
+
+# Local Claude settings
+.claude/settings.local.json
+
+# --- Dependencies & build artifacts ---
+node_modules/
+dist/
+build/
+
+# --- Local / editor noise ---
+.DS_Store
+Thumbs.db
+*.swp
+*~
+*.log
+.vscode/
+.idea/
