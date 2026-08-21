@@ -677,12 +677,19 @@ function optimizePlacement(maxN){
         const s=marginalScore(ci); if(s>bestScore){ bestScore=s; best=ci; } }
     }
     if(best<0) break;
+    // I9: smart early termination — once the Ecovacs spec is met, stop only if
+    // the next beacon adds little USEFUL coverage (0->1 / 1->2 conversions,
+    // redundancy excluded). Keeps taking cheap wins well above the bare spec.
+    if(n+1>=INCLUDED_BEACONS){
+      const dualNow=tally(counts,c=>c>=2)/grid.length;
+      const uncovNow=tally(counts,c=>c===0)/grid.length;
+      if(dualNow>=DUAL_TARGET && uncovNow<=UNCOVERED_MAX){
+        let useful=0; for(const cell of cover[best]){ const cc=counts[cell]; if(cc<=1) useful+=(cc===0?1:3); }
+        if(useful < Math.max(6, 0.03*grid.length)) break;
+      }
+    }
     chosen.push(best);
     for(const cell of cover[best]) counts[cell]++;
-    // stop once spec satisfied and we have at least the 2 included beacons
-    const dualNow=tally(counts,c=>c>=2)/grid.length;
-    const uncov=tally(counts,c=>c===0)/grid.length;
-    if(n+1>=INCLUDED_BEACONS && dualNow>=DUAL_TARGET && uncov<=UNCOVERED_MAX) break;
   }
   beacons = chosen.map(ci=>({x:cands[ci].x, y:cands[ci].y}));
   localRefine(cands, cover);
