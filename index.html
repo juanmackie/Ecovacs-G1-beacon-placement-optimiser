@@ -612,9 +612,41 @@ function generateCandidates(){
 // Precompute, for each candidate, which grid cells it covers (45 m + LoS)
 function candidateCoverage(cands){
   const R=BEACON_RANGE_M*scale;
+  // I12: flat edge buffers + per-call bboxes + inlined segment intersection —
+  // removes all per-edge object property lookups from the hottest loop
+  const polys=obstacles.map(poly=>{
+    const f=new Float64Array(poly.length*4);
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    for(let i=0;i<poly.length;i++){
+      const a=poly[i], b=poly[(i+1)%poly.length];
+      f[i*4]=a.x; f[i*4+1]=a.y; f[i*4+2]=b.x; f[i*4+3]=b.y;
+      if(a.x<minX)minX=a.x; if(a.x>maxX)maxX=a.x; if(a.y<minY)minY=a.y; if(a.y>maxY)maxY=a.y;
+      if(b.x<minX)minX=b.x; if(b.x>maxX)maxX=b.x; if(b.y<minY)minY=b.y; if(b.y>maxY)maxY=b.y;
+    }
+    return {f,minX,minY,maxX,maxY};
+  });
+  const losFast=(ax,ay,bx,by)=>{
+    const sMinX=Math.min(ax,bx),sMaxX=Math.max(ax,bx),sMinY=Math.min(ay,by),sMaxY=Math.max(ay,by);
+    for(const P of polys){
+      if(sMaxX<P.minX||sMinX>P.maxX||sMaxY<P.minY||sMinY>P.maxY) continue;
+      const f=P.f;
+      for(let i=0;i<f.length;i+=4){
+        const x1=f[i],y1=f[i+1],dx=f[i+2]-x1,dy=f[i+3]-y1;
+        const ex=bx-ax,ey=by-ay;
+        const den=ex*dy-ey*dx;   // identical to segIntersect's d
+        if(den===0) continue;
+        const t=((x1-ax)*dy-(y1-ay)*dx)/den;
+        if(t<=0||t>=1) continue;
+        const u=((x1-ax)*ey-(y1-ay)*ex)/den;
+        if(u<=0||u>=1) continue;
+        return false;
+      }
+    }
+    return true;
+  };
   return cands.map(c=>{
     const list=[];
-    for(let i=0;i<grid.length;i++){ const g=grid[i]; if(dist(c,g)<=R && losClear(c,g)) list.push(i); }
+    for(let i=0;i<grid.length;i++){ const g=grid[i]; if(dist(c,g)<=R && losFast(c.x,c.y,g.x,g.y)) list.push(i); }
     return list;
   });
 }

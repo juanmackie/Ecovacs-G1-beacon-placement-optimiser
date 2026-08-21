@@ -9,3 +9,6 @@ iteration	change	dual_cov_pct_best	uncovered_pct_worst	links_valid	runtime_ms	ke
 7	refine jump moves: trial globally top-25 richest candidates in pass 0	91.4	0.9	3/3	3629	reverted
 8	exact exhaustive linked-pair polish when 2 beacons placed	91.4	0.9	3/3	3398	reverted
 9	smart early termination: continue past spec while next beacon adds useful coverage >=3% of cells	99.0	0.9	3/3	3343	kept
+10	blocked-pair penalty (0.5x) in greedy marginal score	99.0	0.9	3/3	3282	reverted
+11	candidateCoverage: hoisted obstacle bboxes (closure losFast)	99.0	0.9	3/3	3362	reverted
+12	candidateCoverage: flat Float64Array edges + per-call bboxes + inlined seg-intersection (sign bug caught by harness, fixed)	99.0	0.9	3/3	3087	kept
