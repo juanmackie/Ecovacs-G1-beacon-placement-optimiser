@@ -1,0 +1,66 @@
+{
+  "skill": "autoresearch",
+  "mode": "classic",
+  "goal": "Improve the GOAT G1 UWB beacon-placement optimizer in index.html against overnight metrics: dual-coverage %, uncovered area %, beacon-link validity, runtime. Bounded at 12 iterations.",
+  "iterations_planned": 12,
+  "iterations_run": 12,
+  "kept": [1, 4, 6, 9, 12],
+  "reverted": [2, 3, 5, 7, 8, 10, 11],
+  "harness": {
+    "entry": "node benchmarks/harness.js [--json]",
+    "loader": "benchmarks/core.js extracts the inline <script> from index.html and evals it in a vm sandbox with DOM/canvas stubs (index.html stays a single file; no refactor)",
+    "scenarios": [
+      "benchmarks/scenarios/rect-obstacles.json (40x30 m lawn, shed + tree)",
+      "benchmarks/scenarios/l-shape.json (L-shaped 50x40 m lawn, corner shed)",
+      "benchmarks/scenarios/los-blocker.json (80x24 m lawn split by near-full wall + tree)"
+    ],
+    "metrics": "dual-coverage %, uncovered %, link validity (graph connected via <=45 m + LOS), blocked in-range pairs, min obstacle gap (>5 m strict), beacon count (2..10), optimizer runtime ms",
+    "keep_rule": "keep if worst-case dual coverage improves, or ties improve worst-case uncovered, or both tie with runtime down >3%; any spec or link-validity violation forces revert"
+  },
+  "results_tsv": "autoresearch/autoresearch-260821-1148/results.tsv",
+  "columns_note": "dual_cov_pct_best = minimum dual coverage across scenarios (worst case); uncovered_pct_worst = maximum uncovered % across scenarios; links_valid = scenarios with fully connected beacon networks; runtime_ms = sum over scenarios of optimizePlacement wall time",
+  "baseline_vs_best": {
+    "rect-obstacles": {
+      "baseline": { "dual_pct": 91.6, "uncovered_pct": 6.2, "beacons": 2, "links": "OK", "min_gap_m": 12.4, "runtime_ms": 4619, "spec": "PASS" },
+      "best":     { "dual_pct": 100.0, "uncovered_pct": 0.0, "beacons": 4, "links": "OK", "min_gap_m": 10.3, "runtime_ms": 725, "spec": "PASS" }
+    },
+    "l-shape": {
+      "baseline": { "dual_pct": 99.0, "uncovered_pct": 0.9, "beacons": 2, "links": "OK", "min_gap_m": 36.0, "runtime_ms": 3914, "spec": "PASS" },
+      "best":     { "dual_pct": 99.0, "uncovered_pct": 0.9, "beacons": 2, "links": "OK", "min_gap_m": 36.0, "runtime_ms": 1189, "spec": "PASS" }
+    },
+    "los-blocker": {
+      "baseline": { "dual_pct": 94.4, "uncovered_pct": 5.6, "beacons": 2, "links": "OK", "min_gap_m": 5.0, "runtime_ms": 5619, "spec": "FAIL (gap exactly 5.0 m)" },
+      "best":     { "dual_pct": 100.0, "uncovered_pct": 0.0, "beacons": 6, "links": "OK", "min_gap_m": 5.3, "runtime_ms": 1173, "spec": "PASS" }
+    },
+    "aggregate": {
+      "worst_dual_pct": "91.6 -> 99.0 (+7.4)",
+      "worst_uncovered_pct": "6.2 -> 0.9",
+      "total_runtime_ms": "~14150 -> ~3090 (-78%)",
+      "link_validity": "3/3 -> 3/3",
+      "note": "baseline los-blocker violated the strict >5 m obstacle-gap spec; best passes all specs on all scenarios"
+    }
+  },
+  "key_findings": [
+    "Baseline greedy stacked beacon 2 onto beacon 1 (spacing floor only applied from the 3rd beacon) and its early-stop accepted the degenerate stack whenever it met spec; fixed by applying the anti-cluster floor from the 2nd beacon with a small-lawn fallback (iter 1).",
+    "Candidate filter used >= 5 m for obstacle gaps but the Ecovacs spec is strictly > 5 m; a beacon at exactly 5.0 m passed in-app validation. Tightened both filter and validator (iter 1).",
+    "Brute-force oracles (bitset pair/triple enumeration over all candidates) proved the kept solutions sit at or near the constrained optimum: rect linked-pair max = 91.6% (the 92.2% 'better' pair is unlinkable), los-blocker needs >= 3 beacons (best connected pair only 72.8%).",
+    "The big coverage win was smart early termination (iter 9): keep placing while the next beacon's USEFUL gain (0->1 / 1->2 conversions, redundancy excluded) >= 3% of cells; rect went 91.6% -> 100% dual with 4 beacons, los-blocker 94.4% -> 100% with 6.",
+    "The biggest runtime win was caching {candidates, coverage lists} per geometry revision so updateJustification's coverageCurve reuses optimizePlacement's precompute (iter 6, -71%).",
+    "Two 'obvious' LOS micro-optimizations were falsified by measurement: a Map-cached bbox rejection in losClear was slower than no cache (iter 5), and hoisted-bbox alone was a wash (iter 11). Flat Float64Array edges + inlined intersection finally delivered ~7% (iter 12); an initial sign error in the inlined test silently changed coverage and was caught by the harness before commit."
+  ],
+  "files_changed": {
+    "index.html": "optimizer section only: strict >5 m gap (candidate filter + validate), anti-cluster spacing from 2nd beacon with fallback, incremental localRefine (wider window: 120 candidates, 0.6R, up to 5 passes), geomRev-keyed candidate/coverage cache shared with coverageCurve, quality-margin early termination, flat-edge LOS fast path in candidateCoverage",
+    "benchmarks/core.js": "new - vm-sandbox loader for the inline script",
+    "benchmarks/harness.js": "new - scenario runner + metrics",
+    "benchmarks/scenarios/*.json": "new - 3 synthetic gardens",
+    "benchmarks/AGENTS.md": "new - DOX child doc for the benchmark boundary",
+    "AGENTS.md": "DOX pass: verification section + child index updated",
+    "autoresearch/autoresearch-260821-1148/": "results.tsv + handoff.json"
+  },
+  "safety": "no git push, no deploy; work committed locally on master only",
+  "next_steps": [
+    "coverageCurve (purchase advice) still uses the old greedy without the iter-9 quality margin; aligning it would make 'beacons to meet spec' consistent with what the optimizer places",
+    "blocked in-range pairs on los-blocker (3) are geometrically unavoidable when covering both sides of the wall within 45 m; app already treats them as warnings",
+    "consider exposing the quality-margin threshold (3% of cells) as a UI setting"
+  ]
+}

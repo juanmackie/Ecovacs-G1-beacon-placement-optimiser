@@ -131,6 +131,7 @@ The app is a self-contained single-file tool with these major sections inside th
 - Draw a boundary, set scale, place beacons, run optimizer
 - Confirm the validation panel shows PASS for all 5 checks
 - Test import/export round-trip
+- Run `node benchmarks/harness.js` — all 3 synthetic scenarios must show `links OK`, `minGap > 5.0`, and `spec PASS` (see `benchmarks/AGENTS.md`); use it before/after any optimizer change
 
 ## Child DOX Index
 
@@ -138,3 +139,4 @@ The app is a self-contained single-file tool with these major sections inside th
 |---|---|
 | `index.html` | Single-file beacon optimizer app (CSS + JS + canvas + optimizer algorithm) |
 | `README.md` | Project overview, usage guide, specs reference |
+| `benchmarks/` | vm-sandbox test harness + synthetic scenarios for the optimizer (see `benchmarks/AGENTS.md`) |
