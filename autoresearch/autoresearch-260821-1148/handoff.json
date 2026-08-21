@@ -57,7 +57,20 @@
     "AGENTS.md": "DOX pass: verification section + child index updated",
     "autoresearch/autoresearch-260821-1148/": "results.tsv + handoff.json"
   },
-  "safety": "no git push, no deploy; work committed locally on master only",
+  "safety": "no git push, no deploy; work committed locally on main only",
+  "continuation": {
+    "summary": "Post-loop verification pass (optimization bound of 12 iterations unchanged): edge-case regression testing, stability gate, syntax check, one robustness fix.",
+    "edge_fix": "generateCandidates now halves its step up to 4 times when zero candidates are found. Root cause investigated: on a 10x8 courtyard with a central obstacle NO valid position exists (corners are exactly 5.0 m from the obstacle, spec is strict >5 m) — baseline had the same behavior, so this was NOT an iteration regression. The fix insures against tight lawns where thin slivers are finer than the default 2 m sampling. Verified behavior-neutral on all 3 benchmark scenarios and deterministic across 5 runs.",
+    "edge_results": {
+      "tiny-infeasible-10x8": "0 beacons, exits cleanly (correct: infeasible under strict >5 m)",
+      "tiny-slivers-12x10": "4 beacons, 97.4% dual, links OK, gap 5.4 m, PASS",
+      "heavy-obstacles-30x30": "5 beacons, 91.0% dual, links OK, gap 5.7 m, PASS",
+      "big-open-120x80": "6 beacons, 100% dual, links OK via hops <=45 m, PASS"
+    },
+    "stability_gate": "5 consecutive harness runs produced byte-identical coverage/uncovered/beacon-count/link results (runtime varies within noise)",
+    "syntax_check": "inline script extracted from index.html parses cleanly via vm.Script",
+    "fixtures": "benchmarks/scenarios/edge/ (not auto-loaded; see its README.md)"
+  },
   "next_steps": [
     "coverageCurve (purchase advice) still uses the old greedy without the iter-9 quality margin; aligning it would make 'beacons to meet spec' consistent with what the optimizer places",
     "blocked in-range pairs on los-blocker (3) are geometrically unavoidable when covering both sides of the wall within 45 m; app already treats them as warnings",
