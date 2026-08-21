@@ -1,0 +1,12 @@
+{
+  "name": "rect-obstacles",
+  "description": "40x30 m rectangular lawn with a shed and a tree (both block LOS, both need 5 m beacon gap)",
+  "scale": 1,
+  "maxBeacons": 10,
+  "boundaries": [[[0,0],[40,0],[40,30],[0,30]]],
+  "obstacles": [
+    [[5,5],[11,5],[11,9],[5,9]],
+    [[31,21],[29.5,23.6],[26.5,23.6],[25,21],[26.5,18.4],[29.5,18.4]]
+  ],
+  "stations": [[20,15]]
+}

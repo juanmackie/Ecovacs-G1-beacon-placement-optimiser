@@ -592,7 +592,7 @@ function generateCandidates(){
   boundaries.forEach(p=>p.forEach(v=>{minX=Math.min(minX,v.x);minY=Math.min(minY,v.y);maxX=Math.max(maxX,v.x);maxY=Math.max(maxY,v.y);}));
   const cands=[];
   const step=Math.max(scale*2, (maxX-minX)/30);  // ~2 m or 30 across
-  const ok=(x,y)=> isMowable(x,y) && obstacles.every(p=>distToObstacle({x,y},p)/scale >= TALL_OBSTACLE_GAP_M);
+  const ok=(x,y)=> isMowable(x,y) && obstacles.every(p=>distToObstacle({x,y},p)/scale > TALL_OBSTACLE_GAP_M);
   for(let x=minX;x<=maxX;x+=step) for(let y=minY;y<=maxY;y+=step) if(ok(x,y)) cands.push({x,y});
   // boundary-inset points (good for perimeter coverage / line of sight)
   const inset=2*scale;
@@ -656,10 +656,15 @@ function optimizePlacement(maxN){
     for(let ci=0;ci<cands.length;ci++){
       if(chosen.includes(ci)) continue;
       const c=cands[ci];
-      // not too clustered; relax for the mandatory first two beacons so small lawns still get 2 (B1)
-      if(chosen.length>=INCLUDED_BEACONS && chosen.some(k=>dist(cands[k],c) < spacingFloor)) continue;
+      // anti-cluster spacing applies from the 2nd beacon on, so two beacons never stack
+      if(chosen.length>=1 && chosen.some(k=>dist(cands[k],c) < spacingFloor)) continue;
       const s=marginalScore(ci);
       if(s>bestScore){ bestScore=s; best=ci; }
+    }
+    if(best<0 && chosen.length>=1){
+      // fallback: lawn too small for the spacing floor — place by score alone (B1)
+      for(let ci=0;ci<cands.length;ci++){ if(chosen.includes(ci)) continue;
+        const s=marginalScore(ci); if(s>bestScore){ bestScore=s; best=ci; } }
     }
     if(best<0) break;
     chosen.push(best);
@@ -741,7 +746,7 @@ function validate(){
   let obstOK=true;
   beacons.forEach((b,i)=>{ b._issues=[];
     obstacles.forEach((poly,oi)=>{ const d=m(distToObstacle(b,poly));
-      if(d<TALL_OBSTACLE_GAP_M){ obstOK=false; b._issues.push(`<5 m from obstacle ${oi+1} (${d.toFixed(1)} m)`); } });
+      if(d<=TALL_OBSTACLE_GAP_M){ obstOK=false; b._issues.push(`≤5 m from obstacle ${oi+1} (${d.toFixed(1)} m)`); } });
     // within bounds — warning only, does not fail the spec
     if(!insideAnyBoundary(b.x,b.y)){ b._issues.push('outside lawn boundary');
       issues.push(`Beacon B${i+1} is outside the lawn boundary (warning — real installs often stake beacons just outside the edge).`); }

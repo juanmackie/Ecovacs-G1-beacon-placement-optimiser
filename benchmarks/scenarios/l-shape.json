@@ -1,0 +1,9 @@
+{
+  "name": "l-shape",
+  "description": "L-shaped lawn 50x40 m with a notch cut out and a small shed in the corner",
+  "scale": 1,
+  "maxBeacons": 10,
+  "boundaries": [[[0,0],[50,0],[50,18],[22,18],[22,40],[0,40]]],
+  "obstacles": [[[44,2],[48,2],[48,8],[44,8]]],
+  "stations": [[5,5]]
+}

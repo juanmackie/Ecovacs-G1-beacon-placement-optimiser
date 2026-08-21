@@ -1,0 +1,4 @@
+iteration	change	dual_cov_pct_best	uncovered_pct_worst	links_valid	runtime_ms	kept
+0	baseline (unmodified index.html)	91.6	6.2	3/3	14152	kept
+1	strict >5m obstacle gap in candidates+validate; anti-cluster spacing from 2nd beacon w/ small-lawn fallback	91.4	0.2	3/3	17153	kept
+2	localRefine: enforce spacing floor + no-new-blocked-pairs during moves	89.0	4.5	3/3	14950	reverted
