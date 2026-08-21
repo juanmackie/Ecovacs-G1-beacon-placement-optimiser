@@ -618,6 +618,17 @@ function candidateCoverage(cands){
     return list;
   });
 }
+// I6: cache candidates + their coverage lists per geometry revision, so the
+// second heavy precompute in a single optimize pass (coverageCurve via
+// updateJustification) reuses the first one instead of redoing it.
+let _candCache=null,_candRev=-1;
+function getCandsCover(){
+  if(_candRev===geomRev && _candCache) return _candCache;
+  const cands=generateCandidates();
+  const cover=candidateCoverage(cands);
+  _candCache={cands,cover}; _candRev=geomRev;
+  return _candCache;
+}
 function linked(a,b){ return dist(a,b)<=BEACON_RANGE_M*scale && losClear(a,b); }
 
 function optimizePlacement(maxN){
@@ -625,9 +636,8 @@ function optimizePlacement(maxN){
   if(!boundaries.length){ flash('Draw a lawn boundary first.'); return; }
   buildGrid();
   if(!grid.length){ flash('No mowable area found inside the boundary.'); return; }
-  const cands=generateCandidates();
+  const {cands,cover}=getCandsCover();
   if(!cands.length){ flash('No valid beacon positions (try a bigger lawn or fewer obstacles).'); return; }
-  const cover=candidateCoverage(cands);
   const counts=new Int8Array(grid.length);   // running coverage per cell
   const chosen=[];
 
@@ -867,8 +877,7 @@ function coverageCurve(){
   if(_curveRev===geomRev && _curveCache) return _curveCache;   // D1: cache per geometry
   const curve=[0];
   if(!grid.length){ _curveCache=curve; _curveRev=geomRev; return curve; }
-  const cands=generateCandidates(); if(!cands.length){ _curveCache=curve; _curveRev=geomRev; return curve; }
-  const cover=candidateCoverage(cands);
+  const {cands,cover}=getCandsCover(); if(!cands.length){ _curveCache=curve; _curveRev=geomRev; return curve; }
   const counts=new Int8Array(grid.length); const chosen=[];
   for(let n=0;n<MAX_BEACONS;n++){
     let best=-1,bs=0;

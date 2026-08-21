@@ -4,3 +4,5 @@ iteration	change	dual_cov_pct_best	uncovered_pct_worst	links_valid	runtime_ms	ke
 2	localRefine: enforce spacing floor + no-new-blocked-pairs during moves	89.0	4.5	3/3	14950	reverted
 3	localRefine rewrite: incremental delta scoring + spacing/link guards + wider window (120 cands, 0.6R, 5 passes)	89.0	4.5	3/3	9623	reverted
 4	localRefine: incremental delta scoring (no guards) + wider window (120 cands, 0.6R, 5 passes)	91.4	0.9	3/3	11718	kept
+5	losClear bbox-rejection cache	91.4	0.9	3/3	11297	reverted
+6	geomRev-keyed cache for {cands,cover} shared by optimizePlacement + coverageCurve	91.4	0.9	3/3	3477	kept
