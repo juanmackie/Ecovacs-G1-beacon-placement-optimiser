@@ -67,7 +67,7 @@ The GOAT G1 navigates by triangulating off UWB beacons. It needs to "see" **two 
 ## How the optimizer works
 
 1. **Grid sampling** — mowable area is discretized into ~1 m cells (auto-scaled for large lawns)
-2. **Candidate generation** — valid positions are every grid cell + boundary-inset points, filtered to be >5 m from obstacles
+2. **Candidate generation** — valid positions on a ~2 m lattice across the lawn (auto-scaled for large lawns) + boundary-inset points, filtered to be >5 m from obstacles
 3. **Greedy placement** — each iteration picks the candidate that maximises marginal coverage gain, weighted to prioritise turning 1-beacon cells into 2-beacon cells
 4. **Connectivity penalty** — candidates unreachable from existing beacons within 45 m + line of sight are down-weighted
 5. **Early stop** — as soon as ≥80% dual coverage and ≤10% no-signal are met

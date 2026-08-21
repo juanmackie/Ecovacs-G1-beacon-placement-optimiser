@@ -447,6 +447,7 @@ $('imgInput').addEventListener('change', e=>{
 function loadImage(url, reset){
   img=new Image();
   img.onload=()=>{ if(reset) resetView(); draw(); markDirty(); };
+  img.onerror=()=>{ flash('Could not load that image file.'); };
   img.src=url;
 }
 
@@ -1003,7 +1004,9 @@ function loadState(d){
   imgDataUrl=d.imgDataUrl||null;
   geomRev++;
   const after=()=>{ resetView(); recompute(); };
-  if(imgDataUrl){ img=new Image(); img.onload=after; img.src=imgDataUrl; } else { img=null; after(); }
+  if(imgDataUrl){ img=new Image(); img.onload=after;
+    img.onerror=()=>{ img=null; recompute(); flash('Background image could not be loaded.'); };
+    img.src=imgDataUrl; } else { img=null; after(); }
 }
 $('btnSaveFile').addEventListener('click', ()=>{
   const blob=new Blob([serialize()],{type:'application/json'});
@@ -1020,8 +1023,10 @@ $('projInput').addEventListener('change', e=>{
 $('btnReport').addEventListener('click', ()=>{
   if(!beacons.length){ flash('Compute a placement first.'); return; }
   const s=coverageStats(); const origin=stations[0]||gridOrigin();
+  const unit=scale?' m':' px';
+  const fmt=v=> scale ? m(v).toFixed(1) : v.toFixed(0);
   const rows=beacons.map((b,i)=>{ let nn=Infinity; beacons.forEach((o,j)=>{if(i!==j)nn=Math.min(nn,m(dist(b,o)));});
-    return `<tr><td>B${i+1}</td><td>${m(b.x-origin.x).toFixed(1)} m</td><td>${m(b.y-origin.y).toFixed(1)} m</td><td>${isFinite(nn)?nn.toFixed(1)+' m':'—'}</td></tr>`; }).join('');
+    return `<tr><td>B${i+1}</td><td>${fmt(b.x-origin.x)}${unit}</td><td>${fmt(b.y-origin.y)}${unit}</td><td>${isFinite(nn)?fmt(nn)+unit:'—'}</td></tr>`; }).join('');
   const okClass=v=>v?'style="color:#0a0"':'style="color:#c00"';
   const dualOK=s.dual>=DUAL_TARGET, uncovOK=s.uncovered<=UNCOVERED_MAX;
   const w=window.open('','_blank');
