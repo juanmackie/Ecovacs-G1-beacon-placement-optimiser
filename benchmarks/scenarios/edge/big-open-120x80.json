@@ -1,0 +1,2 @@
+{"name":"big-open-120x80","description":"120x80 m open lawn - 45 m radius cannot cover it all; expect max beacons, no links beyond 45 m","scale":1,"maxBeacons":10,
+ "boundaries":[[[0,0],[120,0],[120,80],[0,80]]],"obstacles":[],"stations":[[60,40]]}

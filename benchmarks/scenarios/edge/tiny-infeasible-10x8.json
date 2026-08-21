@@ -1,0 +1,2 @@
+{"name":"tiny-10x8","description":"10x8 m courtyard - spacing floor must fall back so 2 beacons still place","scale":1,"maxBeacons":10,
+ "boundaries":[[[0,0],[10,0],[10,8],[0,8]]],"obstacles":[[[4,3],[6,3],[6,5],[4,5]]],"stations":[[2,4]]}

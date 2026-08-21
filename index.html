@@ -591,9 +591,15 @@ function generateCandidates(){
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   boundaries.forEach(p=>p.forEach(v=>{minX=Math.min(minX,v.x);minY=Math.min(minY,v.y);maxX=Math.max(maxX,v.x);maxY=Math.max(maxY,v.y);}));
   const cands=[];
-  const step=Math.max(scale*2, (maxX-minX)/30);  // ~2 m or 30 across
   const ok=(x,y)=> isMowable(x,y) && obstacles.every(p=>distToObstacle({x,y},p)/scale > TALL_OBSTACLE_GAP_M);
-  for(let x=minX;x<=maxX;x+=step) for(let y=minY;y<=maxY;y+=step) if(ok(x,y)) cands.push({x,y});
+  // R-fix: tight lawns can hide valid spots in thin slivers (e.g. corners just
+  // past the 5 m obstacle gap) that the default step steps right over —
+  // halve the step a few times before declaring "no valid positions"
+  let step=Math.max(scale*2, (maxX-minX)/30);  // ~2 m or 30 across
+  for(let tries=0;tries<4 && cands.length===0;tries++){
+    for(let x=minX;x<=maxX;x+=step) for(let y=minY;y<=maxY;y+=step) if(ok(x,y)) cands.push({x,y});
+    if(!cands.length) step/=2;
+  }
   // boundary-inset points (good for perimeter coverage / line of sight)
   const inset=2*scale;
   boundaries.forEach(poly=>poly.forEach((p,i)=>{

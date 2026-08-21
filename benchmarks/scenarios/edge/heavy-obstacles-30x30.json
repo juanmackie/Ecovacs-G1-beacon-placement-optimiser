@@ -1,0 +1,4 @@
+{"name":"heavy-obstacles","description":"30x30 lawn riddled with obstacles - spec may be unreachable, optimizer must not hang or misplace","scale":1,"maxBeacons":10,
+ "boundaries":[[[0,0],[30,0],[30,30],[0,30]]],
+ "obstacles":[[[6,6],[12,6],[12,12],[6,12]],[[18,6],[24,6],[24,12],[18,12]],[[6,18],[12,18],[12,24],[6,24]],[[18,18],[24,18],[24,24],[18,24]]],
+ "stations":[[15,15]]}
