@@ -675,31 +675,52 @@ function optimizePlacement(maxN){
     if(n+1>=INCLUDED_BEACONS && dualNow>=DUAL_TARGET && uncov<=UNCOVERED_MAX) break;
   }
   beacons = chosen.map(ci=>({x:cands[ci].x, y:cands[ci].y}));
-  localRefine(cands);
+  localRefine(cands, cover);
   recompute(); markDirty();
   const st=coverageStats();
   flash(`Placed ${beacons.length} beacon${beacons.length>1?'s':''} · ${(st.dual*100).toFixed(0)}% dual coverage · ${(st.uncovered*100).toFixed(0)}% no signal.`);
 }
 function tally(arr,fn){ let n=0; for(const v of arr) if(fn(v)) n++; return n; }
 
-function localRefine(cands){
+function localRefine(cands, cover){
   if(!beacons.length) return;
-  const score=()=>{ computeCoverage(); const s=coverageStats(); return s.dual*3 - s.uncovered*4; };
-  let cur=score();
-  for(let pass=0;pass<2;pass++){
+  if(!cover) cover=candidateCoverage(cands);
+  const n=grid.length||1;
+  // per-cell contribution to total score n*(dual*3 - uncovered*4)
+  const cellScore=c=> c===0?-4:(c===1?0:3);
+  // map each beacon to its nearest candidate index
+  const idx=beacons.map(b=>{
+    let best=-1,bd=Infinity;
+    for(let ci=0;ci<cands.length;ci++){ const dd=dist(cands[ci],b); if(dd<bd){bd=dd;best=ci;} }
+    return best;
+  });
+  const counts=new Int16Array(grid.length);
+  idx.forEach(ci=>{ for(const cell of cover[ci]) counts[cell]++; });
+  let cur=0; for(let i=0;i<n;i++) cur+=cellScore(counts[i]);
+  for(let pass=0;pass<5;pass++){
+    let improved=false;
     for(let bi=0;bi<beacons.length;bi++){
-      let bestCand=null,bestVal=cur; const b=beacons[bi];
+      const b=beacons[bi]; const oldIdx=idx[bi];
       // D2: only evaluate the nearest candidates to keep large maps responsive
-      const nearIdx=cands.map((c,ci)=>({ci,d:dist(c,b)})).sort((a,b)=>a.d-b.d).slice(0,40);
+      const nearIdx=cands.map((c,ci)=>({ci,d:dist(c,b)})).sort((p,q)=>p.d-q.d).slice(0,120);
+      let bestCi=oldIdx,bestScore=cur;
       for(const {ci} of nearIdx){
-        const c=cands[ci]; if(dist(c,b)>BEACON_RANGE_M*scale*0.4) continue; // local only
-        const old={x:b.x,y:b.y}; b.x=c.x; b.y=c.y;
-        const v=score();
-        if(v>bestVal+1e-6){ bestVal=v; bestCand={x:c.x,y:c.y}; }
-        b.x=old.x; b.y=old.y;
+        if(ci===oldIdx) continue;
+        const c=cands[ci]; if(dist(c,b)>BEACON_RANGE_M*scale*0.6) continue;
+        // incremental score delta over affected cells only (I4 speed)
+        const delta=new Map();
+        for(const cell of cover[oldIdx]) delta.set(cell,(delta.get(cell)||0)-1);
+        for(const cell of cover[ci]) delta.set(cell,(delta.get(cell)||0)+1);
+        let dScore=0; for(const [cell,dv] of delta) dScore+=cellScore(counts[cell]+dv)-cellScore(counts[cell]);
+        if(dScore>0 && cur+dScore>bestScore+1e-9){ bestScore=cur+dScore; bestCi=ci; }
       }
-      if(bestCand){ b.x=bestCand.x; b.y=bestCand.y; cur=bestVal; }
+      if(bestCi!==oldIdx){
+        for(const cell of cover[oldIdx]) counts[cell]--;
+        for(const cell of cover[bestCi]) counts[cell]++;
+        b.x=cands[bestCi].x; b.y=cands[bestCi].y; idx[bi]=bestCi; cur=bestScore; improved=true;
+      }
     }
+    if(!improved) break;
   }
 }
 
