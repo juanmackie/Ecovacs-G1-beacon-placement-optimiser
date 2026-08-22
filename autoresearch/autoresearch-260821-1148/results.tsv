@@ -1,0 +1,14 @@
+iteration	change	dual_cov_pct_best	uncovered_pct_worst	links_valid	runtime_ms	kept
+0	baseline (unmodified index.html)	91.6	6.2	3/3	14152	kept
+1	strict >5m obstacle gap in candidates+validate; anti-cluster spacing from 2nd beacon w/ small-lawn fallback	91.4	0.2	3/3	17153	kept
+2	localRefine: enforce spacing floor + no-new-blocked-pairs during moves	89.0	4.5	3/3	14950	reverted
+3	localRefine rewrite: incremental delta scoring + spacing/link guards + wider window (120 cands, 0.6R, 5 passes)	89.0	4.5	3/3	9623	reverted
+4	localRefine: incremental delta scoring (no guards) + wider window (120 cands, 0.6R, 5 passes)	91.4	0.9	3/3	11718	kept
+5	losClear bbox-rejection cache	91.4	0.9	3/3	11297	reverted
+6	geomRev-keyed cache for {cands,cover} shared by optimizePlacement + coverageCurve	91.4	0.9	3/3	3477	kept
+7	refine jump moves: trial globally top-25 richest candidates in pass 0	91.4	0.9	3/3	3629	reverted
+8	exact exhaustive linked-pair polish when 2 beacons placed	91.4	0.9	3/3	3398	reverted
+9	smart early termination: continue past spec while next beacon adds useful coverage >=3% of cells	99.0	0.9	3/3	3343	kept
+10	blocked-pair penalty (0.5x) in greedy marginal score	99.0	0.9	3/3	3282	reverted
+11	candidateCoverage: hoisted obstacle bboxes (closure losFast)	99.0	0.9	3/3	3362	reverted
+12	candidateCoverage: flat Float64Array edges + per-call bboxes + inlined seg-intersection (sign bug caught by harness, fixed)	99.0	0.9	3/3	3087	kept
