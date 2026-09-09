@@ -1,142 +1,50 @@
-# DOX framework
+# Ecovacs G1 beacon placement optimiser agent contract
 
-- DOX is highly performant AGENTS.md hierarchy installed here
-- Agent must follow DOX instructions across any edits
+## Operating Standard
 
-## Core Contract
+- Apply `C:\Users\juanm\Documents\GitHub\Vibe Coding Rules 10.md` (V10) as the repository operating standard; read it in full before substantive work.
+- This file is the nearest-owning contract. It refines the parent policy with repository-specific facts and cannot weaken a mandatory parent rule; conflicts resolve to the parent.
+- Read this file, then `benchmarks/AGENTS.md` (when touching `benchmarks/`), before editing. The nearest applicable contract plus every parent above it governs the work.
 
-- AGENTS.md files are binding work contracts for their subtrees
-- Work products, source materials, instructions, records, assets, and durable docs must stay understandable from the nearest applicable AGENTS.md plus every parent AGENTS.md above it
+## Scope and Ownership
 
-## Read Before Editing
+- `index.html` — the entire app: a single self-contained HTML file (~1150 lines: CSS + vanilla JS + Canvas 2D). No build step, no server, no dependencies; opening the file in a browser is the whole runtime. It owns drawing tools, scale calibration, the coverage grid, the greedy optimizer, 5-spec validation, heatmap rendering, save/load, and the print report.
+- `README.md` — user-facing overview, quick start, keyboard shortcuts, G1 spec table, optimizer explanation, modeling notes, and source links. Keep it in sync with user-visible behavior.
+- `benchmarks/` — Node-based test harness (`harness.js`), extracted optimizer code (`core.js`), and synthetic scenarios (`scenarios/*.json`, `scenarios/edge/`). Owned by `benchmarks/AGENTS.md`.
+- `MEMORY.md` — small project memory index.
+- `.gitignore` — forbids plan.md, .env, *.local.md, rules documents, `.claude/settings.local.json`, and local/editor noise. Never commit those.
+- `autoresearch/` — experiment-session artifacts; not part of the shipped app, do not edit casually.
 
-1. Read the root AGENTS.md
-2. Identify every file or folder you expect to touch
-3. Walk from the repository root to each target path
-4. Read every AGENTS.md found along each route
-5. If a parent AGENTS.md lists a child AGENTS.md whose scope contains the path, read that child and continue from there
-6. Use the nearest AGENTS.md as the local contract and parent docs for repo-wide rules
-7. If docs conflict, the closer doc controls local work details, but no child doc may weaken DOX
+## Constraints
 
-Do not rely on memory. Re-read the applicable DOX chain in the current session before editing.
-
-## Update After Editing
-
-Every meaningful change requires a DOX pass before the task is done.
-
-Update the closest owning AGENTS.md when a change affects:
-
-- purpose, scope, ownership, or responsibilities
-- durable structure, contracts, workflows, or operating rules
-- required inputs, outputs, permissions, constraints, side effects, or artifacts
-- user preferences about behavior, communication, process, organization, or quality
-- AGENTS.md creation, deletion, move, rename, or index contents
-
-Update parent docs when parent-level structure, ownership, workflow, or child index changes. Update child docs when parent changes alter local rules. Remove stale or contradictory text immediately. Small edits that do not change behavior or contracts may leave docs unchanged, but the DOX pass still must happen.
-
-## Hierarchy
-
-- Root AGENTS.md is the DOX rail: project-wide instructions, global preferences, durable workflow rules, and the top-level Child DOX Index
-- Child AGENTS.md files own domain-specific instructions and their own Child DOX Index
-- Each parent explains what its direct children cover and what stays owned by the parent
-- The closer a doc is to the work, the more specific and practical it must be
-
-## Child Doc Shape
-
-- Create a child AGENTS.md when a folder becomes a durable boundary with its own purpose, rules, responsibilities, workflow, materials, or quality standards
-- Work Guidance must reflect the current standards of the project or user instructions; if there are no specific standards or instructions yet, leave it empty
-- Verification must reflect an existing check; if no verification framework exists yet, leave it empty and update it when one exists
-
-Default section order:
-- Purpose
-- Ownership
-- Local Contracts
-- Work Guidance
-- Verification
-- Child DOX Index
-
-## Style
-
-- Keep docs concise, current, and operational
-- Document stable contracts, not diary entries
-- Put broad rules in parent docs and concrete details in child docs
-- Prefer direct bullets with explicit names
-- Do not duplicate rules across many files unless each scope needs a local version
-- Delete stale notes instead of explaining history
-- Trim obvious statements, repeated rules, misplaced detail, and warnings for risks that no longer exist
-
-## Closeout
-
-1. Re-check changed paths against the DOX chain
-2. Update nearest owning docs and any affected parents or children
-3. Refresh every affected Child DOX Index
-4. Remove stale or contradictory text
-5. Run existing verification when relevant
-6. Report any docs intentionally left unchanged and why
-
-## User Preferences
-
-When the user requests a durable behavior change, record it here or in the relevant child AGENTS.md
-
-## Project Overview
-
-- **Purpose**: Beacon placement optimizer for the ECOVACS GOAT G1 robotic mower
-- **Tech**: Single-file HTML app (HTML + CSS + vanilla JS, no build step)
-- **File**: `index.html` — the entire app (~1063 lines)
-- **Data**: `MEMORY.md` — memory index for project context
-- **Config**: `.claude/settings.local.json` — Claude permissions (git-ignored)
-- **Git**: `.gitignore` — repo-level ignore rules for forbidden files (plan.md, .env, *.local.md, production-ready-vibe-coding-rules, settings.local.json) and local/editor noise
-
-## Architecture
-
-The app is a self-contained single-file tool with these major sections inside the `<script>` block:
-
-| Section | Lines (approx) | Responsibility |
-|---|---|---|
-| Constants | 332–342 | Range (45m), max beacons (10), coverage targets (80%/10%), grid resolution |
-| State | 343–364 | Canvas, zoom/pan, polygons, beacons, scale, grid, geom-rev cache flag |
-| Helpers | 365–419 | Coordinate transforms, point-in-polygon, line-of-sight, obstacle distance |
-| Tools & Input | 420–538 | Tool switching, file upload, resize (DPR-aware), pointer events, polygon drawing, keyboard shortcuts |
-| Scale | 539–556 | Reference line → real-world scale conversion |
-| Coverage Grid | 557–586 | Sample mowable cells, count beacon coverage per cell |
-| Optimizer | 587–699 | Candidate generation (both inset normals), greedy marginal-score placement, local refine (capped), coverage curve |
-| Validation | 700–810 | Check 5 specs: dual coverage, no-signal, link, obstacle gap, station |
-| Justification | 811–860 | "How many beacons & why" cost / coverage-curve panel |
-| Rendering | 861–950 | Canvas draw: heatmap, polygons, beacons, links, grid |
-| UI Wires | 951–975 | Event listeners, zoom controls (centre-anchored), flash/banner |
-| Save / Load | 976–1018 | JSON serialize (persists checkbox states), localStorage (quota fallback), file export/import |
-| Report | 1019–1055 | Print-friendly placement report in a new window (popup-blocker safe) |
-
-## Key Ecovacs GOAT G1 Specs
-
-- Beacons communicate via UWB; max 45m apart with line of sight
-- ≥80% of lawn must be covered by 2+ beacons simultaneously
-- ≤10% of lawn may have zero beacon signal
-- Beacons must be >5m from obstacles taller than 60cm
-- Station needs 2m clear on sides and front, flat lawn, grass ≤6cm
-- Ships with 2 beacons; max 10 per mower
-- Moving a beacon after mapping requires full remap
-
-## Modeling & Validation Notes
-
-- The app uses the **45 m beacon spacing limit as the effective beacon coverage radius** — a modeling assumption (Ecovacs specifies spacing, not a separate robot-to-beacon range); heatmap is approximate near the 45 m fringe. Documented in the Help modal.
-- Obstacles anywhere block line-of-sight, including those drawn outside the lawn boundary; users should draw the house/fences as obstacles even outside the mow area.
-- **Out-of-bounds beacons and blocked in-range pairs are warnings, not failures.** `allOK` (the ✓ Meets spec status) requires dual-coverage, no-signal, link connectivity, obstacle gap, and station clearance — but a missing station passes (with a note) and an out-of-bounds/blocked beacon only adds a warning line.
-- Optimizer places a **mandatory 2 beacons** minimum; the anti-cluster spacing floor is scaled to the lawn diagonal so small lawns still get 2.
-- Beacon candidates are restricted to mowable lawn (candidates outside the boundary are flagged as warnings).
+- No build, no framework, no new dependencies: the app must stay a single editable `index.html` runnable by double-click. Do not introduce package managers, bundlers, or external assets that break offline use.
+- The optimizer must remain deterministic: same input geometry produces the same placement. Verify determinism when touching candidate generation, greedy selection, or refinement (the coverage curve is cached per geometry revision — keep cache invalidation correct).
+- Ecovacs GOAT G1 spec encoded in validation: beacons ≥45 m apart with line of sight; ≥80% of mowable area dual-covered (2+ beacons); ≤10% no-signal; beacons >5 m from obstacles taller than 60 cm; station needs 2 m clear on sides/front; ships with 2 beacons, max 10. Do not weaken these thresholds.
+- The 45 m spacing limit is also used as the effective beacon coverage radius — a documented modeling assumption (Ecovacs specifies spacing, not robot-to-beacon range); heatmap is approximate near the 45 m fringe. Keep this documented in the Help modal and README.
+- Obstacles anywhere block line of sight, including outside the lawn boundary; users draw house/fences as obstacles even outside the mow area. Preserve this behavior.
+- Status semantics are deliberate: out-of-bounds beacons, in-range pairs blocked by obstacles, and a missing station are warnings, not failures. `allOK` (✓ Meets spec) requires dual-coverage, no-signal, link connectivity, obstacle gap, and station clearance only. Do not silently promote warnings to failures.
+- Optimizer invariants: mandatory minimum of 2 beacons; anti-cluster spacing floor scaled to the lawn diagonal so small lawns still get 2; candidates restricted to mowable lawn (outside-boundary candidates flagged as warnings).
+- Save/load: project files are JSON with embedded base64 background images; state auto-saves to localStorage with a quota fallback to geometry-only. Preserve import/export round-trip compatibility with existing saved files.
+- No secrets, credentials, or real site data belong in the repo.
 
 ## Verification
 
-- Open `index.html` in a browser
-- Draw a boundary, set scale, place beacons, run optimizer
-- Confirm the validation panel shows PASS for all 5 checks
-- Test import/export round-trip
-- Run `node benchmarks/harness.js` — all 3 synthetic scenarios must show `links OK`, `minGap > 5.0`, and `spec PASS` (see `benchmarks/AGENTS.md`); use it before/after any optimizer change
+- Automated (required before/after any optimizer change): `node benchmarks/harness.js` — all scenarios must report `links OK`, `minGap > 5.0`, and `spec PASS`. See `benchmarks/AGENTS.md` for scenario conventions; add an edge scenario when fixing a geometry edge case.
+- There is no other automated harness (no package.json, no test runner, no linter). For UI work, hand-verify in a browser by exercising the real journey: open `index.html`, set scale via a reference line, draw a lawn boundary and obstacles, place the station, run Compute Optimal Placement, confirm the validation panel shows PASS on all 5 checks, and test JSON export/import round-trip. A file edit alone is not evidence of correctness.
+- After any optimizer edit, also re-run determinism: same scenario twice, identical output.
 
-## Child DOX Index
+## Documentation index
 
-| Child | Scope |
-|---|---|
-| `index.html` | Single-file beacon optimizer app (CSS + JS + canvas + optimizer algorithm) |
-| `README.md` | Project overview, usage guide, specs reference |
-| `benchmarks/` | vm-sandbox test harness + synthetic scenarios for the optimizer (see `benchmarks/AGENTS.md`) |
+- `README.md` — usage, spec table, optimizer explanation; update when user-visible behavior changes.
+- `MEMORY.md` — project memory index; keep as context, not as rules.
+- `benchmarks/AGENTS.md` — read before any `benchmarks/` edit.
+- Durable contracts live at the nearest owning boundary; update this file when app-wide invariants, scope, or verification change, and do not duplicate rules across files.
+
+## Known gaps
+
+- No screenshot or headless-browser check exists; visual/canvas rendering is verified only by hand.
+- The benchmarks harness runs optimizer logic in a vm sandbox, not the DOM/canvas layers.
+
+## Child contracts
+
+- `benchmarks/AGENTS.md` — owns the harness, core extraction, and scenario conventions. It refines this file and cannot weaken the parent policy (`C:\Users\juanm\Documents\GitHub\Vibe Coding Rules 10.md`).
