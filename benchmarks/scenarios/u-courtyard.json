@@ -1,0 +1,9 @@
+{
+  "name": "u-courtyard",
+  "description": "50x36 m lawn split by a central block into west/east lobes joined only by a northern corridor; greedy tends to over-commit to the first lobe while link topology pulls across the block",
+  "scale": 1,
+  "maxBeacons": 10,
+  "boundaries": [[[0,0],[50,0],[50,36],[0,36]]],
+  "obstacles": [[[19,10],[33,10],[33,36],[19,36]]],
+  "stations": [[5,5]]
+}
