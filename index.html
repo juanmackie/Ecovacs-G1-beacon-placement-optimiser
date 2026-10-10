@@ -731,11 +731,66 @@ function optimizePlacement(maxN){
   }
   beacons = chosen.map(ci=>({x:cands[ci].x, y:cands[ci].y}));
   localRefine(cands, cover);
+  swapRefine(cands, cover, spacingFloor);
   recompute(); markDirty();
   const st=coverageStats();
   flash(`Placed ${beacons.length} beacon${beacons.length>1?'s':''} · ${(st.dual*100).toFixed(0)}% dual coverage · ${(st.uncovered*100).toFixed(0)}% no signal.`);
 }
 function tally(arr,fn){ let n=0; for(const v of arr) if(fn(v)) n++; return n; }
+
+function swapRefine(cands, cover, spacingFloor){
+  // Explorer second pass: single-beacon relocations over the FULL candidate
+  // set (localRefine only scans the nearest 120 within 0.6*range). Catches
+  // escapes the hillclimb cannot see, e.g. jumping a beacon across an
+  // obstacle gap the greedy seed never tried. Deterministic: beacons and
+  // candidates scan in index order, strict improvement only, first win
+  // restarts the scan. Bounded: at most 5 passes. Never stacks beacons:
+  // candidates within spacingFloor of another beacon are skipped.
+  if(!beacons.length) return;
+  if(!cover) cover=candidateCoverage(cands);
+  const n=grid.length||1;
+  const cellScore=c=> c===0?-4:(c===1?0:3);
+  const idx=beacons.map(b=>{
+    let best=-1,bd=Infinity;
+    for(let ci=0;ci<cands.length;ci++){ const dd=dist(cands[ci],b); if(dd<bd){bd=dd;best=ci;} }
+    return best;
+  });
+  const used=()=>new Set(idx);
+  const counts=new Int16Array(grid.length);
+  idx.forEach(ci=>{ for(const cell of cover[ci]) counts[cell]++; });
+  let cur=0; for(let i=0;i<n;i++) cur+=cellScore(counts[i]);
+  for(let pass=0;pass<5;pass++){
+    let improved=false;
+    for(let bi=0;bi<beacons.length;bi++){
+      const oldIdx=idx[bi];
+      const others=used(); others.delete(oldIdx);
+      let bestCi=oldIdx,bestScore=cur;
+      for(let ci=0;ci<cands.length;ci++){
+        if(ci===oldIdx||others.has(ci)) continue;
+        const c=cands[ci];
+        let clash=false;
+        for(let bj=0;bj<beacons.length;bj++){
+          if(bj===bi) continue;
+          if(dist(c,beacons[bj])<spacingFloor){ clash=true; break; }
+        }
+        if(clash) continue;
+        const delta=new Map();
+        for(const cell of cover[oldIdx]) delta.set(cell,(delta.get(cell)||0)-1);
+        for(const cell of cover[ci]) delta.set(cell,(delta.get(cell)||0)+1);
+        let dScore=0; for(const [cell,dv] of delta) dScore+=cellScore(counts[cell]+dv)-cellScore(counts[cell]);
+        if(dScore>0 && cur+dScore>bestScore+1e-9){ bestScore=cur+dScore; bestCi=ci; }
+      }
+      if(bestCi!==oldIdx){
+        for(const cell of cover[oldIdx]) counts[cell]--;
+        for(const cell of cover[bestCi]) counts[cell]++;
+        beacons[bi].x=cands[bestCi].x; beacons[bi].y=cands[bestCi].y;
+        idx[bi]=bestCi; cur=bestScore; improved=true;
+        break;
+      }
+    }
+    if(!improved) break;
+  }
+}
 
 function localRefine(cands, cover){
   if(!beacons.length) return;
